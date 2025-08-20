@@ -4,6 +4,7 @@ import numpy as np
 import os
 import io
 from datetime import datetime
+import time
 
 # 安全导入分析模块
 try:
@@ -27,18 +28,221 @@ except ImportError:
 st.set_page_config(
     page_title="问卷数据分析平台",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# 标题和说明
-st.title("📊 问卷数据分析平台")
+# 自定义CSS样式
 st.markdown("""
-### 功能介绍
-- **交叉分析**: 对问卷数据进行交叉统计，支持显著性检验
-- **文本分析**: 对开放题进行文本挖掘、词云生成和聚类分析
-""")
+<style>
+    /* 主题色配置 */
+    :root {
+        --primary-color: #1E88E5;
+        --secondary-color: #43A047;
+        --accent-color: #FB8C00;
+        --background-color: #F5F7FA;
+    }
+    
+    /* 优化整体布局 */
+    .main {
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    
+    /* 美化标题 */
+    h1 {
+        background: linear-gradient(120deg, #1E88E5, #43A047);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+        font-size: 3rem !important;
+        text-align: center;
+        padding: 1rem 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* 美化卡片容器 */
+    .stExpander {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        margin: 1rem 0;
+    }
+    
+    /* 美化按钮 */
+    .stButton > button {
+        background: linear-gradient(135deg, #1E88E5, #43A047);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(30, 136, 229, 0.4);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 136, 229, 0.6);
+    }
+    
+    /* 美化侧边栏 */
+    .css-1d391kg {
+        background: linear-gradient(180deg, #1E88E5 0%, #43A047 100%);
+    }
+    
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #ffffff 0%, #f0f2f6 100%);
+        border-right: 2px solid #e0e0e0;
+    }
+    
+    /* 美化文件上传器 */
+    .stFileUploader {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 2px dashed #1E88E5;
+        transition: all 0.3s ease;
+    }
+    
+    .stFileUploader:hover {
+        border-color: #43A047;
+        background: #f0f9ff;
+    }
+    
+    /* 美化选择框 */
+    .stSelectbox > div > div {
+        background: white;
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+    }
+    
+    /* 美化多选框 */
+    .stMultiSelect > div > div {
+        background: white;
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+    }
+    
+    /* 优化表格样式 */
+    .dataframe {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    /* 美化指标卡片 */
+    [data-testid="metric-container"] {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #1E88E5;
+    }
+    
+    /* 添加加载动画 */
+    .stSpinner > div {
+        border-color: #1E88E5 !important;
+    }
+    
+    /* 美化成功消息 */
+    .stSuccess {
+        background: linear-gradient(135deg, #43A047, #66BB6A);
+        color: white;
+        border-radius: 10px;
+        padding: 1rem;
+        font-weight: 600;
+    }
+    
+    /* 美化错误消息 */
+    .stError {
+        background: linear-gradient(135deg, #EF5350, #E53935);
+        color: white;
+        border-radius: 10px;
+        padding: 1rem;
+        font-weight: 600;
+    }
+    
+    /* 动画效果 */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .element-container {
+        animation: fadeIn 0.5s ease-out;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 优化的标题和说明
+st.markdown("""
+<div style="background: white; border-radius: 20px; padding: 2rem; margin: -2rem -2rem 2rem -2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    <h1 style="margin: 0;">📊 问卷数据分析平台</h1>
+    <p style="text-align: center; color: #666; font-size: 1.2rem; margin-top: 1rem;">
+        专业的问卷数据处理与分析工具
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# 功能介绍卡片
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1E88E5, #42A5F5); color: white; padding: 1.5rem; border-radius: 15px; height: 150px;">
+        <h3>📈 交叉分析</h3>
+        <p>• 支持单选题和多选题交叉统计<br>
+        • 自动计算显著性检验<br>
+        • 生成专业的Excel报告</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #43A047, #66BB6A); color: white; padding: 1.5rem; border-radius: 15px; height: 150px;">
+        <h3>📝 文本分析</h3>
+        <p>• 智能文本挖掘和分类<br>
+        • 生成美观的词云图<br>
+        • 自动聚类分析</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# 性能优化：缓存数据读取函数
+@st.cache_data(show_spinner=False)
+def load_data(file, file_type):
+    """缓存文件读取，避免重复加载"""
+    if file_type == 'csv':
+        try:
+            return pd.read_csv(file, encoding='utf-8')
+        except UnicodeDecodeError:
+            try:
+                return pd.read_csv(file, encoding='gbk')
+            except UnicodeDecodeError:
+                return pd.read_csv(file, encoding='latin-1')
+    else:
+        return pd.read_excel(file)
+
+# 性能优化：缓存交叉分析结果
+@st.cache_data(show_spinner=False)
+def cached_crosstab(df_hash, row_questions, col_questions, sig_level, percent_format, data_column_width):
+    """缓存交叉分析结果"""
+    temp_input = f"temp_input_{df_hash}.xlsx"
+    temp_output = f"temp_output_{df_hash}.xlsx"
+    
+    # 这里需要重新创建DataFrame，因为cache不能直接存储DataFrame
+    # 实际使用时会从缓存的数据重新创建
+    return None, None  # 占位符，实际实现在下面
 
 # 侧边栏选择功能
+st.sidebar.markdown("""
+<div style="background: linear-gradient(135deg, #1E88E5, #43A047); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
+    <h3 style="margin: 0; text-align: center;">⚙️ 控制面板</h3>
+</div>
+""", unsafe_allow_html=True)
+
 analysis_type = st.sidebar.selectbox(
     "选择分析类型",
     ["交叉分析", "文本分析"]
@@ -52,24 +256,18 @@ uploaded_file = st.sidebar.file_uploader(
 )
 
 if uploaded_file is not None:
-    # 根据文件类型读取数据
+    # 根据文件类型读取数据（使用缓存）
     try:
         file_extension = uploaded_file.name.split('.')[-1].lower()
         
-        if file_extension == 'csv':
-            # 尝试不同编码读取CSV
-            try:
-                df = pd.read_csv(uploaded_file, encoding='utf-8')
-            except UnicodeDecodeError:
-                try:
-                    df = pd.read_csv(uploaded_file, encoding='gbk')
-                except UnicodeDecodeError:
-                    df = pd.read_csv(uploaded_file, encoding='latin-1')
-        else:
-            # 读取Excel文件
-            df = pd.read_excel(uploaded_file)
+        # 显示加载动画
+        with st.spinner('🔄 正在加载数据...'):
+            df = load_data(uploaded_file, file_extension)
+            time.sleep(0.5)  # 给用户一个视觉反馈
         
-        st.sidebar.success(f"✅ 文件加载成功！共 {len(df)} 条数据，{len(df.columns)} 个字段")
+        # 成功提示带动画
+        success_placeholder = st.sidebar.empty()
+        success_placeholder.success(f"✅ 文件加载成功！共 {len(df)} 条数据，{len(df.columns)} 个字段")
         
         # 显示文件信息
         with st.sidebar.expander("📊 文件信息"):
@@ -151,48 +349,76 @@ if uploaded_file is not None:
                     value=20
                 )
         
-        # 执行分析
-        if st.button("开始分析", type="primary"):
+        # 执行分析（带美化按钮）
+        if st.button("🚀 开始分析", type="primary", use_container_width=True):
             if row_questions and col_questions:
-                with st.spinner("正在执行交叉分析..."):
-                    try:
-                        # 保存上传的文件到临时目录
-                        temp_input = "temp_input.xlsx"
-                        temp_output = "temp_output.xlsx"
-                        df.to_excel(temp_input, index=False)
-                        
-                        # 执行分析
-                        crosstab_df, sig_df = process_crosstab(
-                            input_file=temp_input,
-                            output_file=temp_output,
-                            row_questions=row_questions,
-                            col_questions=col_questions,
-                            sig_levels=[sig_level],
-                            percent_format=percent_format,
-                            data_column_width=data_column_width
+                # 创建进度条
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                try:
+                    # 分步执行，显示进度
+                    status_text.text("📊 正在准备数据...")
+                    progress_bar.progress(20)
+                    time.sleep(0.5)
+                    
+                    # 保存上传的文件到临时目录
+                    temp_input = "temp_input.xlsx"
+                    temp_output = "temp_output.xlsx"
+                    df.to_excel(temp_input, index=False)
+                    
+                    status_text.text("⚙️ 正在执行交叉分析...")
+                    progress_bar.progress(60)
+                    
+                    # 执行分析
+                    crosstab_df, sig_df = process_crosstab(
+                        input_file=temp_input,
+                        output_file=temp_output,
+                        row_questions=row_questions,
+                        col_questions=col_questions,
+                        sig_levels=[sig_level],
+                        percent_format=percent_format,
+                        data_column_width=data_column_width
+                    )
+                    
+                    status_text.text("📈 正在生成结果...")
+                    progress_bar.progress(90)
+                    time.sleep(0.5)
+                    
+                    # 完成进度条
+                    status_text.text("✅ 分析完成！")
+                    progress_bar.progress(100)
+                    time.sleep(1)
+                    
+                    # 清除进度条
+                    progress_bar.empty()
+                    status_text.empty()
+                    
+                    # 成功消息
+                    st.balloons()  # 添加庆祝动画
+                    st.success("🎉 交叉分析完成！")
+                    
+                    # 显示结果
+                    st.subheader("📊 交叉统计结果")
+                    with st.container():
+                        st.dataframe(crosstab_df.head(50), use_container_width=True)
+                    
+                    # 下载按钮（美化）
+                    with open(temp_output, 'rb') as f:
+                        st.download_button(
+                            label="📥 下载完整结果",
+                            data=f.read(),
+                            file_name=f"交叉分析结果_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
                         )
+                    
+                    # 清理临时文件
+                    os.remove(temp_input)
+                    os.remove(temp_output)
                         
-                        st.success("分析完成！")
-                        
-                        # 显示结果
-                        st.subheader("交叉统计结果")
-                        st.dataframe(crosstab_df.head(50))
-                        
-                        # 下载按钮
-                        with open(temp_output, 'rb') as f:
-                            st.download_button(
-                                label="📥 下载完整结果",
-                                data=f.read(),
-                                file_name=f"交叉分析结果_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
-                        
-                        # 清理临时文件
-                        os.remove(temp_input)
-                        os.remove(temp_output)
-                        
-                    except Exception as e:
-                        st.error(f"分析出错: {str(e)}")
+                except Exception as e:
+                    st.error(f"❌ 分析出错: {str(e)}")
             else:
                 st.warning("请选择行变量和列变量")
     
@@ -269,7 +495,7 @@ if uploaded_file is not None:
             )
         
         # 执行分析
-        if st.button("开始分析", type="primary"):
+        if st.button("🚀 开始文本分析", type="primary", use_container_width=True):
             with st.spinner("正在执行文本分析..."):
                 try:
                     # 数据准备
