@@ -211,68 +211,75 @@ with col2:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # 多选题识别函数
-@st.cache_data
 def identify_multi_choice_questions(columns):
     """识别多选题并返回优化后的选项列表"""
     import re
     from collections import defaultdict
     
-    # 识别多选题根题
-    multi_choice_dict = defaultdict(list)
-    single_questions = []
-    
-    for col in columns:
-        col_clean = str(col).strip()
-        # 匹配多选题格式 Q数字.
-        match = re.match(r'^(Q\d+\.)', col_clean)
-        if match:
-            root = match.group(1)
-            multi_choice_dict[root].append(col)
-        else:
-            single_questions.append(col)
-    
-    # 过滤出真正的多选题（有多个子选项的）
-    genuine_multi_choice = {}
-    for root, subcols in multi_choice_dict.items():
-        if len(subcols) > 1:
-            # 提取主题干
-            first_subcol = subcols[0]
-            rest_part = first_subcol.split(root)[1].strip()
-            if ':' in rest_part:
-                question_text, _ = rest_part.split(':', 1)
-                main_question = f"{root}{question_text.strip()}"
+    try:
+        # 识别多选题根题
+        multi_choice_dict = defaultdict(list)
+        single_questions = []
+        
+        for col in columns:
+            try:
+                col_clean = str(col).strip()
+                # 匹配多选题格式 Q数字.
+                match = re.match(r'^(Q\d+\.)', col_clean)
+                if match:
+                    root = match.group(1)
+                    multi_choice_dict[root].append(col)
+                else:
+                    single_questions.append(col)
+            except:
+                single_questions.append(col)
+        
+        # 过滤出真正的多选题（有多个子选项的）
+        genuine_multi_choice = {}
+        for root, subcols in multi_choice_dict.items():
+            if len(subcols) > 1:
+                # 简化处理，直接使用root作为主题干
+                main_question = f"{root} [多选题]"
+                genuine_multi_choice[main_question] = subcols
             else:
-                main_question = f"{root}[多选题]"
-            genuine_multi_choice[main_question] = subcols
-        else:
-            # 不是多选题，加入单选题列表
-            single_questions.extend(subcols)
+                # 不是多选题，加入单选题列表
+                single_questions.extend(subcols)
+        
+        return genuine_multi_choice, single_questions
     
-    return genuine_multi_choice, single_questions
+    except Exception as e:
+        # 如果出错，返回原始列表
+        return {}, columns
 
 # 生成优化的选项列表
-@st.cache_data  
 def get_optimized_question_list(columns):
     """生成优化后的问题选项列表"""
-    multi_choice_dict, single_questions = identify_multi_choice_questions(columns)
-    
-    # 创建显示选项
-    display_options = []
-    option_mapping = {}
-    
-    # 添加多选题（显示主题干）
-    for main_question, subcols in multi_choice_dict.items():
-        display_text = f"📋 {main_question} (多选题，{len(subcols)}个选项)"
-        display_options.append(display_text)
-        option_mapping[display_text] = main_question
-    
-    # 添加单选题
-    for question in sorted(single_questions):
-        display_text = f"📝 {question}"
-        display_options.append(display_text)
-        option_mapping[display_text] = question
-    
-    return display_options, option_mapping
+    try:
+        multi_choice_dict, single_questions = identify_multi_choice_questions(columns)
+        
+        # 创建显示选项
+        display_options = []
+        option_mapping = {}
+        
+        # 添加多选题（显示主题干）
+        for main_question, subcols in multi_choice_dict.items():
+            display_text = f"📋 {main_question} ({len(subcols)}个选项)"
+            display_options.append(display_text)
+            option_mapping[display_text] = main_question
+        
+        # 添加单选题
+        for question in single_questions:
+            display_text = f"📝 {question}"
+            display_options.append(display_text)
+            option_mapping[display_text] = question
+        
+        return display_options, option_mapping
+        
+    except Exception as e:
+        # 如果出错，返回原始列表
+        display_options = [f"📝 {col}" for col in columns]
+        option_mapping = {f"📝 {col}": col for col in columns}
+        return display_options, option_mapping
 
 # 性能优化：缓存数据读取函数
 @st.cache_data(show_spinner=False)
@@ -398,52 +405,18 @@ if uploaded_file is not None:
             # 转换为实际的变量名
             col_questions = [option_mapping[display] for display in selected_col_displays]
         
-        # 显示选择的变量信息
+        # 显示选择的变量信息（简化版本）
         if row_questions or col_questions:
-            with st.expander("🔍 已选择的变量详情", expanded=False):
-                multi_choice_dict, single_questions = identify_multi_choice_questions(columns)
-                
+            with st.expander("🔍 已选择的变量", expanded=False):
                 if row_questions:
                     st.write("**🔸 行变量:**")
                     for i, q in enumerate(row_questions, 1):
-                        # 检查是否为多选题
-                        is_multi = any(q.startswith(root.split('[')[0]) for root in multi_choice_dict.keys())
-                        if is_multi:
-                            # 找到对应的多选题选项
-                            matching_key = next((k for k in multi_choice_dict.keys() 
-                                               if q.startswith(k.split('[')[0])), None)
-                            if matching_key:
-                                subcols = multi_choice_dict[matching_key]
-                                st.write(f"{i}. **{q}** (多选题)")
-                                st.write(f"   包含 {len(subcols)} 个选项:")
-                                for j, subcol in enumerate(subcols[:5], 1):  # 只显示前5个
-                                    option_text = subcol.split(':', 1)[-1].strip() if ':' in subcol else subcol
-                                    st.write(f"   • {option_text}")
-                                if len(subcols) > 5:
-                                    st.write(f"   • ... 还有 {len(subcols)-5} 个选项")
-                        else:
-                            st.write(f"{i}. **{q}** (单选题)")
+                        st.write(f"{i}. {q}")
                 
                 if col_questions:
                     st.write("**🔹 列变量:**") 
                     for i, q in enumerate(col_questions, 1):
-                        # 检查是否为多选题
-                        is_multi = any(q.startswith(root.split('[')[0]) for root in multi_choice_dict.keys())
-                        if is_multi:
-                            # 找到对应的多选题选项
-                            matching_key = next((k for k in multi_choice_dict.keys() 
-                                               if q.startswith(k.split('[')[0])), None)
-                            if matching_key:
-                                subcols = multi_choice_dict[matching_key]
-                                st.write(f"{i}. **{q}** (多选题)")
-                                st.write(f"   包含 {len(subcols)} 个选项:")
-                                for j, subcol in enumerate(subcols[:5], 1):  # 只显示前5个
-                                    option_text = subcol.split(':', 1)[-1].strip() if ':' in subcol else subcol
-                                    st.write(f"   • {option_text}")
-                                if len(subcols) > 5:
-                                    st.write(f"   • ... 还有 {len(subcols)-5} 个选项")
-                        else:
-                            st.write(f"{i}. **{q}** (单选题)")
+                        st.write(f"{i}. {q}")
         
         # 高级选项
         with st.expander("高级选项"):
