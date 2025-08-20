@@ -2,17 +2,26 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
-import warnings
 import io
 from datetime import datetime
-import base64
 
-# 导入分析模块
-from cross_analysis import process_crosstab
-from text_analysis import (
-    clean_text, manual_tagging, generate_wordcloud, 
-    text_clustering, export_results
-)
+# 安全导入分析模块
+try:
+    from cross_analysis import process_crosstab
+    CROSS_ANALYSIS_AVAILABLE = True
+except ImportError:
+    CROSS_ANALYSIS_AVAILABLE = False
+    st.error("交叉分析模块加载失败")
+
+try:
+    from text_analysis import (
+        clean_text, manual_tagging, generate_wordcloud, 
+        text_clustering, export_results
+    )
+    TEXT_ANALYSIS_AVAILABLE = True
+except ImportError:
+    TEXT_ANALYSIS_AVAILABLE = False
+    st.error("文本分析模块加载失败")
 
 # 页面配置
 st.set_page_config(
@@ -52,6 +61,10 @@ if uploaded_file is not None:
     
     if analysis_type == "交叉分析":
         st.header("📈 交叉分析")
+        
+        if not CROSS_ANALYSIS_AVAILABLE:
+            st.error("交叉分析功能暂时不可用，请稍后重试")
+            st.stop()
         
         col1, col2 = st.columns(2)
         
@@ -140,6 +153,10 @@ if uploaded_file is not None:
     
     elif analysis_type == "文本分析":
         st.header("📝 文本分析")
+        
+        if not TEXT_ANALYSIS_AVAILABLE:
+            st.error("文本分析功能暂时不可用，请稍后重试")
+            st.stop()
         
         # 选择文本列
         text_column = st.selectbox(
