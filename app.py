@@ -46,18 +46,63 @@ analysis_type = st.sidebar.selectbox(
 
 # 文件上传
 uploaded_file = st.sidebar.file_uploader(
-    "上传Excel文件",
-    type=['xlsx', 'xls'],
-    help="请上传包含问卷数据的Excel文件"
+    "上传数据文件",
+    type=['xlsx', 'xls', 'csv'],
+    help="支持Excel文件(.xlsx, .xls)和CSV文件(.csv)"
 )
 
 if uploaded_file is not None:
-    # 读取数据
-    df = pd.read_excel(uploaded_file)
-    st.sidebar.success(f"文件加载成功！共 {len(df)} 条数据")
+    # 根据文件类型读取数据
+    try:
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        if file_extension == 'csv':
+            # 尝试不同编码读取CSV
+            try:
+                df = pd.read_csv(uploaded_file, encoding='utf-8')
+            except UnicodeDecodeError:
+                try:
+                    df = pd.read_csv(uploaded_file, encoding='gbk')
+                except UnicodeDecodeError:
+                    df = pd.read_csv(uploaded_file, encoding='latin-1')
+        else:
+            # 读取Excel文件
+            df = pd.read_excel(uploaded_file)
+        
+        st.sidebar.success(f"✅ 文件加载成功！共 {len(df)} 条数据，{len(df.columns)} 个字段")
+        
+        # 显示文件信息
+        with st.sidebar.expander("📊 文件信息"):
+            st.write(f"**文件名:** {uploaded_file.name}")
+            st.write(f"**文件类型:** {file_extension.upper()}")
+            st.write(f"**数据行数:** {len(df)}")
+            st.write(f"**字段数量:** {len(df.columns)}")
+            
+    except Exception as e:
+        st.sidebar.error(f"❌ 文件读取失败: {str(e)}")
+        st.stop()
     
     # 显示列名供选择
     columns = df.columns.tolist()
+    
+    # 添加数据预览功能
+    with st.expander("🔍 数据预览", expanded=False):
+        st.subheader("前5行数据")
+        st.dataframe(df.head(), use_container_width=True)
+        
+        st.subheader("数据概览")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("总行数", len(df))
+        with col2:
+            st.metric("总列数", len(df.columns))
+        with col3:
+            st.metric("缺失值", df.isnull().sum().sum())
+        
+        # 显示字段列表
+        st.subheader("字段列表")
+        for i, col in enumerate(df.columns, 1):
+            st.write(f"{i}. **{col}** (类型: {df[col].dtype})")
     
     if analysis_type == "交叉分析":
         st.header("📈 交叉分析")
