@@ -392,8 +392,6 @@ if uploaded_file is not None:
                 display_options,
                 help="📋 多选题已合并显示，📝 表示单选题"
             )
-            # 转换为实际的变量名
-            row_questions = [option_mapping[display] for display in selected_row_displays]
         
         with col2:
             st.subheader("📊 列变量配置") 
@@ -402,8 +400,29 @@ if uploaded_file is not None:
                 display_options,
                 help="📋 多选题已合并显示，📝 表示单选题"
             )
-            # 转换为实际的变量名
-            col_questions = [option_mapping[display] for display in selected_col_displays]
+        
+        # 转换为cross_analysis.py可以处理的格式
+        def convert_to_analysis_format(selected_displays, option_mapping, columns):
+            """将选择的显示格式转换为分析函数可处理的格式"""
+            result = []
+            multi_choice_dict, _ = identify_multi_choice_questions(columns)
+            
+            for display in selected_displays:
+                original_question = option_mapping[display]
+                
+                # 检查是否为多选题
+                if "[多选题]" in original_question:
+                    # 提取Q数字.格式
+                    root_pattern = original_question.split(" [多选题]")[0]
+                    result.append(root_pattern)
+                else:
+                    result.append(original_question)
+            
+            return result
+        
+        # 转换为实际的变量名（兼容cross_analysis.py）
+        row_questions = convert_to_analysis_format(selected_row_displays, option_mapping, columns)
+        col_questions = convert_to_analysis_format(selected_col_displays, option_mapping, columns)
         
         # 显示选择的变量信息（简化版本）
         if row_questions or col_questions:
@@ -451,14 +470,27 @@ if uploaded_file is not None:
                     # 分步执行，显示进度
                     status_text.text("📊 正在准备数据...")
                     progress_bar.progress(20)
-                    time.sleep(0.5)
                     
-                    # 保存上传的文件到临时目录
-                    temp_input = "temp_input.xlsx"
-                    temp_output = "temp_output.xlsx"
-                    df.to_excel(temp_input, index=False)
+                    # 验证变量有效性
+                    if not row_questions or not col_questions:
+                        st.error("请选择行变量和列变量")
+                        return
                     
                     status_text.text("⚙️ 正在执行交叉分析...")
+                    progress_bar.progress(40)
+                    
+                    # 使用内存中的DataFrame，避免文件I/O
+                    import tempfile
+                    import uuid
+                    
+                    # 创建唯一的临时文件名
+                    session_id = str(uuid.uuid4())[:8]
+                    temp_input = f"temp_input_{session_id}.xlsx"
+                    temp_output = f"temp_output_{session_id}.xlsx"
+                    
+                    # 快速保存到临时文件
+                    df.to_excel(temp_input, index=False, engine='openpyxl')
+                    
                     progress_bar.progress(60)
                     
                     # 执行分析
@@ -505,11 +537,41 @@ if uploaded_file is not None:
                         )
                     
                     # 清理临时文件
-                    os.remove(temp_input)
-                    os.remove(temp_output)
+                    try:
+                        if os.path.exists(temp_input):
+                            os.remove(temp_input)
+                        if os.path.exists(temp_output):
+                            os.remove(temp_output)
+                    except Exception as cleanup_error:
+                        st.warning(f"临时文件清理失败: {cleanup_error}")
                         
                 except Exception as e:
+                    # 清理进度条
+                    try:
+                        progress_bar.empty()
+                        status_text.empty()
+                    except:
+                        pass
+                    
+                    # 清理临时文件
+                    try:
+                        if 'temp_input' in locals() and os.path.exists(temp_input):
+                            os.remove(temp_input)
+                        if 'temp_output' in locals() and os.path.exists(temp_output):
+                            os.remove(temp_output)
+                    except:
+                        pass
+                    
                     st.error(f"❌ 分析出错: {str(e)}")
+                    
+                    # 显示调试信息（开发模式）
+                    with st.expander("🔍 错误详情（调试用）"):
+                        st.code(f"""
+错误类型: {type(e).__name__}
+错误信息: {str(e)}
+行变量: {row_questions}
+列变量: {col_questions}
+                        """, language="text")
             else:
                 st.warning("请选择行变量和列变量")
     
